@@ -251,12 +251,11 @@ class Contract:
         if msg.kind == 'borrow':
             self.handle_borrow(metadata, msg)
 
-        return True
+        return 'accept'
 
     def handle_deposit(self, data):
         if data["metadata"]["msg_sender"] != self.rollup_address:
-            reject_input(f"Input does not come from the Portal", data["payload"])
-            return False
+            return reject_input(f"Input does not come from the Portal", data["payload"])
 
         try:
             binary = bytes.fromhex(data["payload"][2:])
@@ -278,12 +277,12 @@ class Contract:
         pool.loans[depositor].total -= returned
         pool.deposits[depositor].total += surplus
 
-        return True
+        return 'accept'
 
     def advance_state(self, data):
         for handler in [self.handle_message, self.handle_deposit]:
             result = handler(data)
-            if result in ['reject', 'accept', True]:
+            if result in ['reject', 'accept']:
                 return result
 
         return reject_input('unsupported input', data["payload"])
@@ -307,15 +306,16 @@ while True:
     logger.info(f"Received finish status {response.status_code}")
     if response.status_code == 202:
         logger.info("No pending rollup request, trying again")
-    else:
-        rollup_request = response.json()
-        data = rollup_request["data"]
-        metadata = data["metadata"]
-        # initialize the contract if it is the first time
-        if metadata and metadata["epoch_index"] == 0 and metadata["input_index"] == 0:
-            contract.init(metadata)
-            continue
+        continue
 
-        req_type = rollup_request["request_type"]
-        handler = getattr(contract, req_type)
-        finish["status"] = handler(rollup_request["data"])
+    rollup_request = response.json()
+    data = rollup_request["data"]
+    metadata = data["metadata"]
+    # initialize the contract if it is the first time
+    if metadata and metadata["epoch_index"] == 0 and metadata["input_index"] == 0:
+        contract.init(metadata)
+        continue
+
+    req_type = rollup_request["request_type"]
+    handler = getattr(contract, req_type)
+    finish["status"] = handler(rollup_request["data"])
