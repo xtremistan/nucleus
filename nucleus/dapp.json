@@ -1,0 +1,5 @@
+{
+  "fs": {
+    "files": ["nucleus.py", "entrypoint.sh"]
+  }
+}
